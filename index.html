@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Taryfikator Mechanik</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Taryfikator Mechanik</h1>
+    <p>Wybierz usterki/naprawy, ustaw ilość (liczba sztuk/instancji) i oblicz orientacyjny koszt.</p>
+  </header>
+
+  <main class="container">
+    <section class="accordion">
+      <button class="accordion-btn">Silnik</button>
+      <div class="panel">
+        <div class="item" data-min="500" data-max="2000">
+          <label><input type="checkbox" class="chk"> Wymiana świec zapłonowych</label>
+          <input type="number" class="qty" min="1" value="1">
+          <div class="range">Koszt: od 500 do 2000 PLN</div>
+        </div>
+
+        <div class="item" data-min="1500" data-max="8000">
+          <label><input type="checkbox" class="chk"> Remont głowicy / uszczelka pod głowicą</label>
