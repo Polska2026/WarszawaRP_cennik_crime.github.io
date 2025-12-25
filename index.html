@@ -24,3 +24,97 @@
 
         <div class="item" data-min="1500" data-max="8000">
           <label><input type="checkbox" class="chk"> Remont głowicy / uszczelka pod głowicą</label>
+          <input type="number" class="qty" min="1" value="1">
+          <div class="range">Koszt: od 1500 do 8000 PLN</div>
+        </div>
+
+        <div class="item" data-min="300" data-max="1200">
+          <label><input type="checkbox" class="chk"> Wymiana paska rozrządu</label>
+          <input type="number" class="qty" min="1" value="1">
+          <div class="range">Koszt: od 300 do 1200 PLN</div>
+        </div>
+      </div>
+    </section>
+    
+    <section class="accordion">
+      <button class="accordion-btn">Hamulce</button>
+      <div class="panel">
+        <div class="item" data-min="200" data-max="800">
+          <label><input type="checkbox" class="chk"> Wymiana klocków hamulcowych (zestaw)</label>
+          <input type="number" class="qty" min="1" value="1">
+          <div class="range">Koszt: od 200 do 800 PLN</div>
+        </div>
+
+        <div class="item" data-min="500" data-max="2500">
+          <label><input type="checkbox" class="chk"> Wymiana tarcz hamulcowych</label>
+          <input type="number" class="qty" min="1" value="1">
+          <div class="range">Koszt: od 500 do 2500 PLN</div>
+        </div>
+      </div>
+    </section>
+    
+    <section class="accordion">
+      <button class="accordion-btn">Zawieszenie</button>
+      <div class="panel">
+        <div class="item" data-min="150" data-max="700">
+          <label><input type="checkbox" class="chk"> Wymiana amortyzatorów (szt.)</label>
+          <input type="number" class="qty" min="1" value="1">
+          <div class="range">Koszt: od 150 do 700 PLN</div>
+        </div>
+
+        <div class="item" data-min="100" data-max="500">
+          <label><input type="checkbox" class="chk"> Naprawa wahacza</label>
+          <input type="number" class="qty" min="1" value="1">
+          <div class="range">Koszt: od 100 do 500 PLN</div>
+        </div>
+      </div>
+    </section>
+    <section class="accordion">
+      <button class="accordion-btn">Elektryka</button>
+      <div class="panel">
+        <div class="item" data-min="200" data-max="1200">
+          <label><input type="checkbox" class="chk"> Wymiana alternatora</label>
+          <input type="number" class="qty" min="1" value="1">
+          <div class="range">Koszt: od 200 do 1200 PLN</div>
+        </div>
+
+        <div class="item" data-min="100" data-max="600">
+          <label><input type="checkbox" class="chk"> Naprawa instalacji elektrycznej</label>
+          <input type="number" class="qty" min="1" value="1">
+          <div class="range">Koszt: od 100 do 600 PLN</div>
+        </div>
+      </div>
+    </section>
+    
+    <section class="accordion">
+      <button class="accordion-btn">Karoseria</button>
+      <div class="panel">
+        <div class="item" data-min="300" data-max="2000">
+          <label><input type="checkbox" class="chk"> Lakierowanie zderzaka</label>
+          <input type="number" class="qty" min="1" value="1">
+          <div class="range">Koszt: od 300 do 2000 PLN</div>
+        </div>
+
+        <div class="item" data-min="500" data-max="4000">
+          <label><input type="checkbox" class="chk"> Naprawa wgniecenia / blacharka</label>
+          <input type="number" class="qty" min="1" value="1">
+          <div class="range">Koszt: od 500 do 4000 PLN</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="controls">
+      <button id="calc">Oblicz</button>
+      <button id="reset">Resetuj</button>
+      <div id="summary">
+                <div>Wybrane pozycji: <span id="count">0</span></div>
+        <div>Suma orientacyjna: <span id="sum">0</span> PLN</div>
+        <div>Zakres: <span id="minSum">0</span> — <span id="maxSum">0</span> PLN</div>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
