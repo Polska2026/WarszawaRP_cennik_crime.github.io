@@ -171,7 +171,7 @@
 
 <div class="container">
     <h1>📈 Notowania Giełdowe Półświatka</h1>
-    <p style="text-align: center; color: #888; margin-bottom: 30px;">Aktualne ceny rynkowe (Update: Live)</p>
+    <p style="text-align: center; color: #888; margin-bottom: 30px;">Aktualne ceny rynkowe (Update: Live / Symulacja nieobecności)</p>
 
     <div class="chart-container">
         <canvas id="marketChart"></canvas>
@@ -184,16 +184,21 @@
 
     <div id="admin-panel">
         <h2 style="color: var(--accent-red);">⚠️ Panel Zarządzania Cenami</h2>
-        <p style="font-size: 0.8rem; color: #888; margin-bottom: 15px;">Zmieniając cenę tutaj, aktualizujesz wykres i strzałki trendów.</p>
+        <p style="font-size: 0.8rem; color: #888; margin-bottom: 15px;">Zmieniając cenę tutaj, aktualizujesz wykres i strzałki trendów (lokalnie).</p>
         <div class="admin-controls" id="admin-inputs">
             </div>
     </div>
 </div>
 
 <script>
-    // --- BAZA DANYCH ---
-    // Tutaj są zdefiniowane wszystkie towary
-    let products = [
+    // --- KONFIG ---
+    const STORAGE_KEY = 'rp_market_data';
+    const LAST_UPDATE_KEY = 'rp_market_last_update';
+    const AUTO_UPDATE_INTERVAL_MS = 60 * 1000; // 1 minuta
+    const SIMULATION_CAP_MINUTES = 10080; // limit symulacji do 7 dni (opcjonalne zabezpieczenie)
+
+    // --- DOMYŚLNE PRODUKTY (fallback) ---
+    const defaultProducts = [
         { id: 'marihuana', name: '🌿 Marihuana', unit: '1 paczka (10g)', price: 850, prevPrice: 850, desc: 'Standard RP, niski próg wejścia.' },
         { id: 'haze', name: '🌿 Silver Haze', unit: '1 paczka (10g)', price: 1000, prevPrice: 1000, desc: 'Odmiana marihuany, droższa.' },
         { id: 'hasz', name: '🟫 Hasz', unit: '1 porcja (10g)', price: 1400, prevPrice: 1400, desc: 'Mocniejszy produkt z konopii.' },
@@ -204,72 +209,110 @@
         { id: 'fentanyl', name: '☠️ Fentanyl', unit: '1 fiolka (2g)', price: 3500, prevPrice: 3500, desc: 'Najcięższa i ryzykowna substancja.' }
     ];
 
-    // Sprawdzenie LocalStorage (żeby ceny zapisały się u Ciebie po odświeżeniu)
-    const savedData = localStorage.getItem('rp_market_data');
-    if (savedData) {
-        products = JSON.parse(savedData);
+    // --- ŁADUJ DANE Z LocalStorage ---
+    function loadStoredProducts() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return defaultProducts.map(p => ({...p}));
+            const parsed = JSON.parse(raw);
+            if (!Array.isArray(parsed) || parsed.length === 0) return defaultProducts.map(p => ({...p}));
+            // ensure prevPrice exists
+            parsed.forEach(p => { if (typeof p.prevPrice === 'undefined') p.prevPrice = p.price; });
+            return parsed;
+        } catch (e) {
+            console.warn('Błąd parsowania stored data, używam domyślnych:', e);
+            return defaultProducts.map(p => ({...p}));
+        }
     }
 
-    // Upewnij się, że każdy produkt ma prevPrice (w razie starego zapisu)
-    products.forEach(p => {
-        if (typeof p.prevPrice === 'undefined') p.prevPrice = p.price;
-    });
+    function saveProducts(products) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
+    }
 
-    // --- INICJALIZACJA WYKRESU ---
-    const ctx = document.getElementById('marketChart').getContext('2d');
-    
-    // Konfiguracja wykresu
-    let marketChart = new Chart(ctx, {
-        type: 'bar', // Typ wykresu: słupkowy
-        data: {
-            labels: products.map(p => p.name),
-            datasets: [{
-                label: 'Cena rynkowa ($)',
-                data: products.map(p => p.price),
-                backgroundColor: [
-                    'rgba(46, 204, 113, 0.6)', // Green
-                    'rgba(46, 204, 113, 0.8)', 
-                    'rgba(160, 82, 45, 0.7)',  // Brown
-                    'rgba(255, 255, 255, 0.7)', // White
-                    'rgba(200, 200, 200, 0.7)', 
-                    'rgba(231, 76, 60, 0.7)',  // Red
-                    'rgba(52, 152, 219, 0.7)', // Blue
-                    'rgba(142, 68, 173, 0.7)'  // Purple
-                ],
-                borderColor: 'rgba(0,0,0,0.5)',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    grid: { color: '#333' },
-                    ticks: { color: '#888' }
-                },
-                x: {
-                    grid: { display: false },
-                    ticks: { color: '#ccc', font: { size: 11 } }
-                }
-            },
-            plugins: {
-                legend: { display: false } // Ukrywamy legendę bo to oczywiste
-            }
+    // --- ZARZĄDZANIE CZASEM OSTATNIEJ AKTUALIZACJI ---
+    function getLastUpdate() {
+        const raw = localStorage.getItem(LAST_UPDATE_KEY);
+        if (!raw) return null;
+        const t = parseInt(raw, 10);
+        return isNaN(t) ? null : new Date(t);
+    }
+    function setLastUpdate(date = new Date()) {
+        localStorage.setItem(LAST_UPDATE_KEY, String(date.getTime()));
+    }
+
+    // --- LOSOWA ZMIANA JEDNEGO PRODUKTU (procent od -5% do +5%) ---
+    function applyRandomChangeOnce(product) {
+        const changePct = (Math.random() * 10) - 5; // [-5, +5)
+        const old = product.price || 1;
+        const newPrice = Math.max(1, Math.round(old * (1 + changePct / 100)));
+        product.prevPrice = old;
+        product.price = newPrice;
+    }
+
+    // --- ZASTOSUJ JEDNO LOSOWANIE DLA WSZYSTKICH PRODUKTÓW ---
+    function randomizeAllOnce(products) {
+        products.forEach(p => applyRandomChangeOnce(p));
+    }
+
+    // --- SYMULACJA "N" MINUT NIEOBECNOŚCI (wykonuje N losowań) ---
+    function simulateMissingMinutes(products, minutes) {
+        if (minutes <= 0) return;
+        const m = Math.min(minutes, SIMULATION_CAP_MINUTES);
+        // Wydajniejsze: powielamy N razy mnożenie, ale trzymamy prevPrice z przed ostatniego kroku
+        for (let i = 0; i < m; i++) {
+            products.forEach(p => {
+                applyRandomChangeOnce(p);
+            });
         }
-    });
+    }
+
+    // --- INICJALIZACJA WYKRESU (po załadowaniu produktów) ---
+    let marketChart;
+    function initChart(products) {
+        const ctx = document.getElementById('marketChart').getContext('2d');
+        if (marketChart) marketChart.destroy();
+        marketChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: products.map(p => p.name),
+                datasets: [{
+                    label: 'Cena rynkowa ($)',
+                    data: products.map(p => p.price),
+                    backgroundColor: [
+                        'rgba(46, 204, 113, 0.6)',
+                        'rgba(46, 204, 113, 0.8)',
+                        'rgba(160, 82, 45, 0.7)',
+                        'rgba(255, 255, 255, 0.7)',
+                        'rgba(200, 200, 200, 0.7)',
+                        'rgba(231, 76, 60, 0.7)',
+                        'rgba(52, 152, 219, 0.7)',
+                        'rgba(142, 68, 173, 0.7)'
+                    ],
+                    borderColor: 'rgba(0,0,0,0.5)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, grid: { color: '#333' }, ticks: { color: '#888' } },
+                    x: { grid: { display: false }, ticks: { color: '#ccc', font: { size: 11 } } }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
 
     // --- GENEROWANIE KART I ADMINA ---
     const cardsContainer = document.getElementById('cards-container');
     const adminContainer = document.getElementById('admin-inputs');
 
-    function renderUI() {
+    function renderUI(products) {
         cardsContainer.innerHTML = '';
         adminContainer.innerHTML = '';
 
         products.forEach((product, index) => {
-            // 1. Logika strzałek
             let trendHtml = '<span class="trend-arrow trend-neutral">➖</span>';
             let trendText = '';
             
@@ -281,7 +324,6 @@
                 trendText = '<span style="font-size:0.7em; color:var(--accent-red)"> (-Spadek)</span>';
             }
 
-            // 2. Tworzenie Karty HTML
             const cardHTML = `
                 <div class="card">
                     <div class="card-header">
@@ -298,7 +340,6 @@
             `;
             cardsContainer.innerHTML += cardHTML;
 
-            // 3. Tworzenie Inputa dla Admina
             const inputHTML = `
                 <div class="control-group">
                     <label>${product.name}</label>
@@ -309,59 +350,35 @@
         });
     }
 
-    // --- FUNKCJA AKTUALIZACJI CEN (ręczne przez admina) ---
+    // --- AKTUALIZACJA CEN PRZEZ ADMINA (lokalnie) ---
     function updatePrice(index, newPrice) {
         newPrice = parseInt(newPrice);
         if (isNaN(newPrice) || newPrice < 1) return;
         
-        // Zapisujemy starą cenę jako 'prevPrice' żeby wykryć trend
         products[index].prevPrice = products[index].price;
         products[index].price = newPrice;
 
-        // Aktualizacja wykresu
+        // Zapisz i odśwież
+        setLastUpdate(new Date());
+        saveProducts(products);
+
         marketChart.data.datasets[0].data[index] = newPrice;
         marketChart.update();
-
-        // Zapisz w pamięci przeglądarki
-        localStorage.setItem('rp_market_data', JSON.stringify(products));
-
-        // Odśwież widok kart (żeby pokazać strzałki)
-        renderUI();
+        renderUI(products);
     }
 
-    // --- FUNKCJA LOSOWEJ ZMIANY CEN co -5%..+5% ---
-    function randomizeAllPrices() {
-        products.forEach((product, index) => {
-            // Ensure prevPrice exists
-            if (typeof product.prevPrice === 'undefined') product.prevPrice = product.price;
-
-            // Losowy procent od -5 do +5
-            const changePct = (Math.random() * 10) - 5; // [-5, +5)
-            // Oblicz nową cenę na podstawie obecnej ceny
-            const newPrice = Math.max(1, Math.round(product.price * (1 + changePct / 100)));
-
-            // Zapis poprzedniej i nowej ceny
-            product.prevPrice = product.price;
-            product.price = newPrice;
-
-            // Aktualizacja danych wykresu
-            marketChart.data.datasets[0].data[index] = newPrice;
-        });
-
-        // Aktualizuj wykres i UI raz po przejściu przez wszystkie produkty
+    // --- FUNKCJA WYWOŁYWANA CO 1 MINUTĘ (podczas aktywnej sesji) ---
+    function randomizeAllPricesDuringSession() {
+        randomizeAllOnce(products);
+        setLastUpdate(new Date());
+        saveProducts(products);
+        // Aktualizuj wykres (raz, po zmianach)
+        marketChart.data.datasets[0].data = products.map(p => p.price);
         marketChart.update();
-        localStorage.setItem('rp_market_data', JSON.stringify(products));
-        renderUI();
+        renderUI(products);
     }
 
-    // Uruchom losowanie co 1 minutę (60000 ms)
-    const AUTO_UPDATE_INTERVAL_MS = 60 * 1000;
-    setInterval(randomizeAllPrices, AUTO_UPDATE_INTERVAL_MS);
-
-    // (Opcjonalnie) możesz odkomentować poniższe, aby wykonać zmianę od razu przy starcie:
-    // randomizeAllPrices();
-
-    // --- FUNKCJA LOGOWANIA ---
+    // --- LOGOWANIE/ADMIN ---
     function toggleAdmin() {
         const panel = document.getElementById('admin-panel');
         if (panel.style.display === 'block') {
@@ -377,8 +394,39 @@
         }
     }
 
-    // Pierwsze uruchomienie
-    renderUI();
+    // --- START (główna sekwencja) ---
+    let products = loadStoredProducts();
+
+    // Sprawdź kiedy była ostatnia aktualizacja i zasymuluj minuty nieobecności
+    (function simulateAbsenceAndInit() {
+        const last = getLastUpdate();
+        const now = new Date();
+
+        if (!last) {
+            // brak zapisu — ustaw teraz i zapisz produkty
+            setLastUpdate(now);
+            saveProducts(products);
+        } else {
+            const diffMs = now - last;
+            const minutesElapsed = Math.floor(diffMs / 60000);
+            if (minutesElapsed > 0) {
+                // Symuluj losowania za minuty, które minęły
+                simulateMissingMinutes(products, minutesElapsed);
+                // Zapisz wynik i ustaw nową datę ostatniej aktualizacji
+                setLastUpdate(now);
+                saveProducts(products);
+            }
+        }
+
+        // Inicjalizuj wykres/UI
+        initChart(products);
+        renderUI(products);
+
+        // W czasie aktywnej sesji nadal wykonuj aktualizację co 1 minutę
+        setInterval(() => {
+            randomizeAllPricesDuringSession();
+        }, AUTO_UPDATE_INTERVAL_MS);
+    })();
 
 </script>
 
