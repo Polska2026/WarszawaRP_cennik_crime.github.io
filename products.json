@@ -1,0 +1,10 @@
+[
+  {"id":"marihuana","name":"🌿 Marihuana RP","unit":"1 paczka (10g)","price":850,"prevPrice":850,"desc":"Standard RP"},
+  {"id":"haze","name":"🌿 Silver Haze RP","unit":"1 paczka (10g)","price":1000,"prevPrice":1000,"desc":"Odmiana"},
+  {"id":"hasz","name":"🟫 Hasz RP","unit":"1 porcja (10g)","price":1400,"prevPrice":1400,"desc":"Mocny"},
+  {"id":"koka","name":"❄️ Kokaina RP","unit":"1 porcja (15g)","price":1100,"prevPrice":1100,"desc":"Średni risk"},
+  {"id":"crack","name":"🪨 Crack RP","unit":"1 porcja (10g)","price":1500,"prevPrice":1500,"desc":"Wysokie ryzyko"},
+  {"id":"heroina","name":"💉 Heroina RP","unit":"1 fiolka (5g)","price":2000,"prevPrice":2000,"desc":"High risk"},
+  {"id":"morfina","name":"💊 Morfina RP","unit":"1 fiolka (5g)","price":1800,"prevPrice":1800,"desc":"Aparatura"},
+  {"id":"fentanyl","name":"☠️ Fentanyl RP","unit":"1 fiolka (2g)","price":3500,"prevPrice":3500,"desc":"Najcięższa"}
+]
