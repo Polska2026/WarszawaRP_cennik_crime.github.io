@@ -1,0 +1,92 @@
+name: Market tick
+
+on:
+  schedule:
+    # uruchamiaj co 5 minut
+    - cron: '*/5 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Update products.json prices
+        run: |
+          python - <<'PY'
+          import json, random, math, sys
+          path = 'products.json'
+          try:
+            with open(path, 'r', encoding='utf-8') as f:
+              data = json.load(f)
+          except Exception as e:
+            print('Cannot read products.json:', e)
+            sys.exit(0)
+
+          # data expected as list of products
+          if isinstance(data, dict):
+            # support wrapper formats
+            if 'rp_market' in data and 'products' in data['rp_market']:
+              arr = data['rp_market']['products']
+              wrapper = ('rp_market','products')
+            elif 'products' in data:
+              arr = data['products']
+              wrapper = ('products',)
+            else:
+              # try to find list
+              arr = []
+              for v in data.values():
+                if isinstance(v, list):
+                  arr = v
+                  break
+              wrapper = None
+          elif isinstance(data, list):
+            arr = data
+            wrapper = None
+          else:
+            print('Unsupported products.json format')
+            sys.exit(0)
+
+          for item in arr:
+            old = int(item.get('price',1))
+            change = random.uniform(-5,5)  # procent [-5, +5)
+            new = max(1, int(round(old * (1 + change/100.0))))
+            item['prevPrice'] = old
+            item['price'] = new
+
+          # write back keeping original wrapper if possible
+          if wrapper == ('rp_market','products'):
+            out = {'rp_market': {'products': arr}}
+          elif wrapper == ('products',):
+            out = {'products': arr}
+          elif wrapper is None and isinstance(data, list):
+            out = arr
+          else:
+            # fallback - overwrite with list
+            out = arr
+
+          with open(path, 'w', encoding='utf-8') as f:
+            json.dump(out, f, ensure_ascii=False, indent=2)
+          print('Updated products.json')
+          PY
+
+      - name: Commit & push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add products.json
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "chore: market tick — update prices [ci skip]"
+            git push
+          fi
